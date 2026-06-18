@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SAM3 frame-labeling worker.
 
-This script is intentionally process-oriented: dg-labeller launches it with a
+This script is intentionally process-oriented: sam3_labeler launches it with a
 model Python environment, and the FastAPI app never imports SAM3 or holds model
 state.
 """
@@ -63,7 +63,7 @@ class Sam3ImageLabeler:
             from sam3.model_builder import build_sam3_image_model
         except ImportError as exc:
             raise RuntimeError(
-                "SAM3 is not importable. Check DGL_MODEL_PYTHON and DGL_SAM3_REPO."
+                "SAM3 is not importable. Check SAM3_LABELER_MODEL_PYTHON and SAM3_LABELER_SAM3_REPO."
             ) from exc
 
         import torch

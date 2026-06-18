@@ -1,11 +1,11 @@
-/* DeGirum Design System — CSS variables.
+/* Design tokens — CSS variables.
  *
  * Two brand variants live here. Pick ONE per project — do not mix.
  *
  *   :root[data-brand="operator"]   green-gradient brand. Used for live operator UIs.
  *                                   Right for: alarm-layout / live operator UIs / single-app dashboards.
  *
- *   :root[data-brand="product"]    blue + glass brand. Used in degirum-videodb-streamui.
+ *   :root[data-brand="product"]    blue + glass brand.
  *                                   Right for: multi-page product chrome / SaaS-style apps / search-driven UIs.
  *
  * If you don't set data-brand, "operator" applies (the more vivid one).
@@ -75,7 +75,6 @@
 
 /* ──────────────────────────────────────────────────────────── */
 /*  Product variant — blue / glass / shadow-glow                */
-/*  (degirum-videodb-streamui style)                            */
 /* ──────────────────────────────────────────────────────────── */
 
 :root[data-brand="product"] {

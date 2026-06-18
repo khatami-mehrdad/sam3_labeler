@@ -1,6 +1,6 @@
 """Scene detection — extract one keyframe per scene.
 
-Uses PySceneDetect's ContentDetector (same approach as degirum-videodb).
+Uses PySceneDetect's ContentDetector for scene boundary detection.
 Threshold ~27 is the library default for cuts; lower (e.g. 15) for more
 sensitive cuts in CCTV-style content.
 """

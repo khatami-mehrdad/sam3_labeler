@@ -1,4 +1,4 @@
-"""dg-labeller FastAPI app entrypoint.
+"""sam3_labeler FastAPI app entrypoint.
 
 Run:
     bash run.sh
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="dg-labeller", lifespan=lifespan)
+app = FastAPI(title="sam3_labeler", lifespan=lifespan)
 
 # Static files (CSS / future assets)
 app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")

@@ -142,7 +142,7 @@ async def optimize_class(
         if on_progress:
             await on_progress(f"{step}: testing on SAM3...")
 
-        overlay_dir = tempfile.mkdtemp(prefix=f"dgl_onto_{class_name}_iter{iteration}_")
+        overlay_dir = tempfile.mkdtemp(prefix=f"sam3_labeler_onto_{class_name}_iter{iteration}_")
         sam3_results = await tester.test_prompts(
             prompts=prompts,
             images=[str(p) for p in exemplar_images],

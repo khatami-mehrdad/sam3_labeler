@@ -71,7 +71,7 @@ def main():
     print(f"  loaded in {load_time:.1f}s, allocated GPU memory: {mem_gb:.1f} GB\n")
 
     # === FIND TEST IMAGES ===
-    bench_dir = Path(os.environ.get("DGL_BENCH_IMAGE_DIR", "/tmp/dgl_test_imgs"))
+    bench_dir = Path(os.environ.get("SAM3_LABELER_BENCH_IMAGE_DIR", "/tmp/sam3_labeler_test_imgs"))
     test_imgs = sorted(bench_dir.glob("*.jpg"))[:8]
     print(f"using {len(test_imgs)} test frames\n")
 

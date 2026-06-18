@@ -71,7 +71,7 @@ class PromptTesterProcess:
             proc = await self._ensure_running()
 
             if overlay_dir is None:
-                overlay_dir = tempfile.mkdtemp(prefix="dgl_overlays_")
+                overlay_dir = tempfile.mkdtemp(prefix="sam3_labeler_overlays_")
 
             request = {
                 "prompts": prompts,

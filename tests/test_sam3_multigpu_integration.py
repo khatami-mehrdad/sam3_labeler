@@ -17,12 +17,12 @@ def test_real_sam3_workers_can_label_on_multiple_available_gpus(
     tmp_path: Path,
     cafe_camera_dirs: list[Path],
 ) -> None:
-    if os.environ.get("DGL_RUN_SAM3_GPU_TESTS") != "1":
-        pytest.skip("set DGL_RUN_SAM3_GPU_TESTS=1 to run real SAM3 GPU integration tests")
-    if not os.environ.get("DGL_MODEL_PYTHON"):
-        pytest.skip("DGL_MODEL_PYTHON must point at the SAM3 Python environment")
-    if not os.environ.get("DGL_SAM3_REPO"):
-        pytest.skip("DGL_SAM3_REPO must point at the upstream SAM3 checkout")
+    if os.environ.get("SAM3_LABELER_RUN_GPU_TESTS") != "1":
+        pytest.skip("set SAM3_LABELER_RUN_GPU_TESTS=1 to run real SAM3 GPU integration tests")
+    if not os.environ.get("SAM3_LABELER_MODEL_PYTHON"):
+        pytest.skip("SAM3_LABELER_MODEL_PYTHON must point at the SAM3 Python environment")
+    if not os.environ.get("SAM3_LABELER_SAM3_REPO"):
+        pytest.skip("SAM3_LABELER_SAM3_REPO must point at the upstream SAM3 checkout")
 
     gpus = sam3_workers.selected_gpus()
     if len(gpus) < 2:

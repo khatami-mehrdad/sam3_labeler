@@ -1,4 +1,4 @@
-/* dg-labeller — local styles (built on .degirum-design tokens.css).
+/* sam3_labeler — local styles (built on tokens.css).
  * Uses product variant (blue/glass).
  */
 
@@ -12,8 +12,8 @@ body {
   line-height: 1.5;
 }
 
-/* ===== header (matches degirum-design header pattern) ===== */
-.dgl-header {
+/* ===== header (matches design tokens header pattern) ===== */
+.app-header {
   height: 52px;
   padding: 0 20px;
   display: flex; align-items: center; gap: 20px;
@@ -22,19 +22,19 @@ body {
   border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 60;
 }
-.dgl-logo {
+.app-logo {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--brand);
   text-decoration: none;
 }
-.dgl-sub {
+.app-sub {
   font-size: 10px; font-weight: 600; color: var(--text-3);
   text-transform: uppercase; letter-spacing: 0.12em;
 }
-.dgl-nav { display: flex; gap: 20px; }
-.dgl-nav-tab {
+.app-nav { display: flex; gap: 20px; }
+.app-nav-tab {
   font-size: 11px; font-weight: 600; letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--text-3); cursor: pointer;
@@ -42,17 +42,17 @@ body {
   transition: color var(--transition-base);
   text-decoration: none;
 }
-.dgl-nav-tab:hover { color: var(--text-1); }
-.dgl-nav-tab.active { color: var(--brand); border-bottom: 2px solid var(--brand); }
-.dgl-spacer { flex: 1; }
-.dgl-status {
+.app-nav-tab:hover { color: var(--text-1); }
+.app-nav-tab.active { color: var(--brand); border-bottom: 2px solid var(--brand); }
+.app-spacer { flex: 1; }
+.app-status {
   font-family: var(--font-mono);
   font-size: 10px; color: var(--text-2);
 }
-.dgl-status b { color: var(--text-0); font-weight: 500; }
+.app-status b { color: var(--text-0); font-weight: 500; }
 
 /* ===== layout ===== */
-.dgl-main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.app-main { padding: 24px; max-width: 1400px; margin: 0 auto; }
 
 .section-header {
   display: flex; align-items: center; gap: 12px;

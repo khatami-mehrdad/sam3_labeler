@@ -1,8 +1,8 @@
-# dg-labeller Agent Context
+# sam3_labeler Agent Context
 
 ## Purpose
 
-`dg-labeller` is an internal DeGirum labelling tool that turns raw image directories or local video files into raw SAM3.1 annotation runs. It exposes a FastAPI/Jinja web UI around frame preparation, pHash dedup, and external SAM3 worker processes. Curation and dataset export are separate tasks, not part of the labeling critical path.
+`sam3_labeler` is a labeling tool that turns raw image directories or local video files into raw SAM3.1 annotation runs. It exposes a FastAPI/Jinja web UI around frame preparation, pHash dedup, and external SAM3 worker processes. Curation and dataset export are separate tasks, not part of the labeling critical path.
 
 Keep cleanup changes conservative. This repo runs heavy GPU models and writes large per-job artifacts, so prefer small, verifiable edits over broad refactors.
 
@@ -50,15 +50,15 @@ Avoid reading, indexing, or committing generated artifacts unless the user expli
 - generated YOLO datasets
 - downloaded videos and extracted frames
 - `.venv/`, `venv/`, `__pycache__/`, `.pytest_cache/`, `*.egg-info/`
-- `.degirum-design/`, `.claude/`
+- `.claude/`
 
 The `.gitignore` already excludes the main runtime and local-only paths.
 
 ## Important Caveats
 
-- `app/core/config.py` derives `ROOT` from the checkout path by default. Use `DGL_ROOT` and `DGL_ALLOWED_GPUS` for host-specific overrides.
-- SAM3 runs in worker subprocesses launched by `DGL_MODEL_PYTHON`; use `DGL_SAM3_REPO` and `DGL_SAM3_CHECKPOINT` for the external model runtime.
-- `bench_gemma4.py` is standalone; use `DGL_BENCH_IMAGE_DIR` to point it at benchmark images.
+- `app/core/config.py` derives `ROOT` from the checkout path by default. Use `SAM3_LABELER_ROOT` and `SAM3_LABELER_ALLOWED_GPUS` for host-specific overrides.
+- SAM3 runs in worker subprocesses launched by `SAM3_LABELER_MODEL_PYTHON`; use `SAM3_LABELER_SAM3_REPO` and `SAM3_LABELER_CHECKPOINT` for the external model runtime.
+- `bench_gemma4.py` is standalone; use `SAM3_LABELER_BENCH_IMAGE_DIR` to point it at benchmark images.
 - Keep docs and UI placeholders generic. Search for local absolute paths before committing portability cleanup.
 - FiftyOne and Label Studio are optional integrations but are part of `app/routes/jobs.py`; keep their dependency and runtime footprint in mind when simplifying.
 - `pyproject.toml` declares the core app dependencies, but optional integration dependencies such as FiftyOne and Label Studio SDK/CLI are not currently declared.

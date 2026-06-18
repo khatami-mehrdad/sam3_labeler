@@ -14,7 +14,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--cafe-frames",
         type=int,
-        default=int(os.environ.get("DGL_TEST_CAFE_FRAMES", "10")),
+        default=int(os.environ.get("SAM3_LABELER_TEST_CAFE_FRAMES", "10")),
         help="Number of consecutive cafe frames to use per camera.",
     )
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}New labeling run · dg-labeller{% endblock %}
+{% block title %}New labeling run · sam3_labeler{% endblock %}
 {% set active = 'labeling' %}
 {% block head_extra %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
@@ -61,7 +61,7 @@
           <div class="modal-header">
             <div>
               <div class="panel-header" style="margin-bottom:4px">Browse server files</div>
-              <div class="hint">Select an image folder or local video file under <span class="mono">DGL_BROWSE_ROOT</span>.</div>
+              <div class="hint">Select an image folder or local video file under <span class="mono">SAM3_LABELER_BROWSE_ROOT</span>.</div>
             </div>
             <button type="button" class="btn btn-ghost" @click="browser.open = false">Close</button>
           </div>
