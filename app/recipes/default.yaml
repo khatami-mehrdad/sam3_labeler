@@ -1,0 +1,10 @@
+# Default SAM3.1 labeling recipe.
+# UI populates `sources` and `ontology` from the form.
+
+video_fps: 2.0
+scene_detect: true
+scene_threshold: 27.0
+phash_dedup: true
+
+score_threshold: 0.35
+save_masks: true

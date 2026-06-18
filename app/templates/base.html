@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-brand="product">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}dg-labeller{% endblock %}</title>
+  <link rel="stylesheet" href="/static/tokens.css">
+  <link rel="stylesheet" href="/static/dgl.css">
+  {% block head_extra %}{% endblock %}
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+  <header class="dgl-header">
+    <a class="dgl-logo" href="/">DG-LABELLER</a>
+    <nav class="dgl-nav">
+      <a class="dgl-nav-tab {% if active=='new' %}active{% endif %}" href="/new">New run</a>
+      <a class="dgl-nav-tab {% if active=='visualizer' %}active{% endif %}" href="/visualizer">Visualizer</a>
+      <a class="dgl-nav-tab {% if active=='exports' %}active{% endif %}" href="/exports">Export</a>
+      <a class="dgl-nav-tab {% if active=='ontology' %}active{% endif %}" href="/ontology">Ontology</a>
+      <a class="dgl-nav-tab {% if active=='labeling' %}active{% endif %}" href="/">Jobs Status</a>
+    </nav>
+    <div class="dgl-spacer"></div>
+    <div class="dgl-status">{% block headerstatus %}{% endblock %}</div>
+  </header>
+
+  <main class="dgl-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

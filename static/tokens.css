@@ -1,0 +1,139 @@
+/* DeGirum Design System — CSS variables.
+ *
+ * Two brand variants live here. Pick ONE per project — do not mix.
+ *
+ *   :root[data-brand="operator"]   green-gradient brand. Used for live operator UIs.
+ *                                   Right for: alarm-layout / live operator UIs / single-app dashboards.
+ *
+ *   :root[data-brand="product"]    blue + glass brand. Used in degirum-videodb-streamui.
+ *                                   Right for: multi-page product chrome / SaaS-style apps / search-driven UIs.
+ *
+ * If you don't set data-brand, "operator" applies (the more vivid one).
+ *
+ * Both share the same dark surface stack and typography.
+ */
+
+:root,
+:root[data-brand="operator"] {
+  /* ===== brand (operator: green gradient) ===== */
+  --brand:           #0BBF8A;
+  --brand-left:      #00A5CF;
+  --brand-right:     #38D960;
+  --brand-gradient:  linear-gradient(135deg, #00A5CF, #0BBF8A, #38D960);
+  --brand-dim:       rgba(11,191,138,0.10);
+  --brand-glow:      rgba(11,191,138,0.30);
+  --brand-muted:     rgba(11,191,138,0.06);
+
+  /* ===== severity ===== */
+  --critical:         #ff4d4d;
+  --critical-dim:     rgba(255,77,77,0.08);
+  --critical-glow:    rgba(255,77,77,0.30);
+  --critical-border:  rgba(255,77,77,0.30);
+  --warning:          #ffcc00;
+  --warning-dim:      rgba(255,204,0,0.08);
+  --warning-glow:     rgba(255,204,0,0.20);
+  --warning-border:   rgba(255,204,0,0.30);
+
+  /* ===== surfaces (dark) ===== */
+  --bg:              #0f1115;
+  --surface:         #1a1d23;
+  --border:          #2d3139;
+  --border-light:    rgba(255,255,255,0.08);
+
+  /* ===== text (5-step gray scale; 0 = brightest) ===== */
+  --text-0: #ffffff;
+  --text-1: #d1d5db;
+  --text-2: #9ca3af;
+  --text-3: #6b7280;
+  --text-4: #4b5563;
+  --text-5: #374151;
+
+  /* ===== glass surfaces ===== */
+  --glass-strong:  rgba(15,17,21,0.92);   /* nav bar, modals */
+  --glass-panel:   rgba(26,29,35,0.50);   /* card, panel */
+  --glass-subtle:  rgba(26,29,35,0.40);   /* search/inputs region */
+  --glass-input:   rgba(15,17,21,0.50);   /* form fields */
+  --blur-heavy:    blur(12px);
+  --blur-medium:   blur(8px);
+
+  /* ===== radius ===== */
+  --radius-sm:    6px;
+  --radius-md:    8px;
+  --radius-lg:    10px;
+  --radius-xl:    12px;   /* product variant uses 12px more often */
+  --radius-pill:  9999px;
+
+  /* ===== motion ===== */
+  --transition-fast: 0.15s;
+  --transition-base: 0.20s;
+  --transition-slow: 0.30s;
+
+  /* ===== typography ===== */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* ──────────────────────────────────────────────────────────── */
+/*  Product variant — blue / glass / shadow-glow                */
+/*  (degirum-videodb-streamui style)                            */
+/* ──────────────────────────────────────────────────────────── */
+
+:root[data-brand="product"] {
+  /* primary blue scale (Tailwind primary preset) */
+  --brand:           #3b82f6;       /* primary-500 */
+  --brand-strong:    #2563eb;       /* primary-600 — buttons */
+  --brand-deep:      #1d4ed8;       /* primary-700 — pressed */
+  --brand-soft:      #60a5fa;       /* primary-400 — hover */
+  --brand-pale:      #dbeafe;       /* primary-100 — backgrounds */
+  --brand-gradient:  linear-gradient(135deg, #2563eb, #3b82f6, #60a5fa);
+  --brand-dim:       rgba(59,130,246,0.10);
+  --brand-glow:      rgba(59,130,246,0.20);
+  --brand-muted:     rgba(59,130,246,0.06);
+
+  /* product surfaces are slightly darker + cooler than operator */
+  --bg:              #0b0e14;       /* surface.base */
+  --surface:         #131720;       /* surface.card */
+  --raised:          #1a1f2b;       /* surface.raised — elevated cards */
+  --border:          #232935;       /* surface.border */
+  --border-light:    #2d3548;       /* surface.border-glow — hover */
+
+  /* product uses tailwind glass: white-on-translucent */
+  --glass-panel:     rgba(255,255,255,0.04);   /* "glass card" */
+  --glass-strong:    rgba(11,14,20,0.92);
+  --glass-subtle:    rgba(255,255,255,0.02);
+  --glass-input:     rgba(255,255,255,0.04);
+
+  /* signature shadow-glow for primary CTAs and focus */
+  --shadow-glow-sm:  0 0 15px -3px rgba(37, 99, 235, 0.15);
+  --shadow-glow-md:  0 0 25px -5px rgba(37, 99, 235, 0.20);
+  --shadow-glow-focus: 0 0 20px -4px rgba(59, 130, 246, 0.15);
+}
+
+/* ──────────────────────────────────────────────────────────── */
+/*  Animations (shared)                                         */
+/* ──────────────────────────────────────────────────────────── */
+
+@keyframes fadeInUp {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes pulseLive {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.8; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}

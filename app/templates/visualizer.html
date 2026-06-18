@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}Visualizer · dg-labeller{% endblock %}
+{% set active = 'visualizer' %}
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/css/elfinder.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/css/theme.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/js/elfinder.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="annotationVisualizer()" x-init="init()">
+  <div class="section-header"><span>SAM3 annotation visualizer</span></div>
+
+  <div class="panel">
+    <div class="field">
+      <div class="label-row">
+        <label>Annotation JSON file</label>
+        <button type="button" class="btn btn-ghost" @click="openBrowser()">Browse server files</button>
+      </div>
+      <div class="row">
+        <input class="input" x-model="annotationPath" placeholder="/path/to/sam3/annotations/image_00000000.json">
+        <button type="button" class="btn btn-primary" :disabled="loading" @click="loadAnnotation()">Load</button>
+      </div>
+      <div class="hint">Choose a SAM3 annotation json under <span class="mono">jobs/</span>, then inspect mask + bbox + score per detection.</div>
+    </div>
+    <div x-show="error" class="error-text" x-text="error"></div>
+  </div>
+
+  <div class="modal-backdrop" x-show="browser.open" x-cloak>
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="panel-header" style="margin-bottom:4px">Browse annotation files</div>
+          <div class="hint">Select a <span class="mono">.json</span> file from <span class="mono">jobs/</span>.</div>
+        </div>
+        <button type="button" class="btn btn-ghost" @click="browser.open = false">Close</button>
+      </div>
+      <div class="browser-actions">
+        <button type="button" class="btn btn-primary" @click="useSelectedAnnotation()">Add selected</button>
+      </div>
+      <div id="annotation-file-browser"></div>
+    </div>
+  </div>
+
+  <div class="row" style="align-items:flex-start" x-show="annotation">
+    <div style="flex:2">
+      <div class="panel">
+        <div class="row" style="margin-bottom:8px">
+          <label class="checkbox"><input type="checkbox" x-model="showBoxes" @change="draw()"> Show boxes</label>
+          <label class="checkbox"><input type="checkbox" x-model="showMasks" @change="draw()"> Show masks</label>
+        </div>
+        <div class="viz-canvas-wrap">
+          <canvas x-ref="overlayCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1">
+      <div class="panel">
+        <div class="panel-header">Categories</div>
+        <div class="hint" style="margin-bottom:8px" x-text="detectionSummary()"></div>
+        <div class="viz-detection-list">
+          <template x-for="group in classGroups" :key="group.name">
+            <div
+              class="viz-detection-row"
+              :class="{'active': selectedClass === group.name}"
+              @click="selectedClass = group.name; draw()"
+            >
+              <label class="checkbox" @click.stop>
+                <input type="checkbox" x-model="group.visible" @change="setClassVisible(group.name, group.visible)">
+              </label>
+              <div class="viz-det-text">
+                <div><b x-text="group.name"></b></div>
+                <div class="hint">
+                  <span x-text="group.count + ' detections'"></span> ·
+                  <span x-text="group.maskCount + ' masks'"></span> ·
+                  <span x-text="'max score ' + Number(group.maxScore || 0).toFixed(4)"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function annotationVisualizer() {
+  return {
+    annotationPath: '',
+    annotation: null,
+    detections: [],
+    classGroups: [],
+    selectedClass: null,
+    imageUrl: '',
+    baseImage: null,
+    error: '',
+    loading: false,
+    showBoxes: true,
+    showMasks: true,
+    activeToken: 0,
+    drawScheduled: false,
+    resizeHandler: null,
+    maskAbortControllers: {},
+    browser: {
+      open: false,
+      initialized: false,
+      instance: null,
+    },
+    maskCache: {},
+
+    init() {
+      this.resizeHandler = () => {
+        this.syncCanvasSize();
+        this.draw();
+      };
+      window.addEventListener('resize', this.resizeHandler);
+    },
+
+    openBrowser() {
+      this.browser.open = true;
+      this.$nextTick(() => this.initFileBrowser());
+    },
+
+    initFileBrowser() {
+      if (this.browser.initialized) return;
+      $('#annotation-file-browser').elfinder({
+        url: '/elfinder/annotations',
+        lang: 'en',
+        height: 520,
+        resizable: false,
+        rememberLastDir: false,
+        commandsOptions: {
+          getfile: {
+            onlyURL: false,
+            folders: false,
+            multiple: false,
+          },
+        },
+        getFileCallback: (file) => {
+          if (!file) return false;
+          if (file.mime === 'directory') return false;
+          if (file.path && file.path.endsWith('.json')) {
+            this.annotationPath = file.path;
+            this.browser.open = false;
+          }
+          return false;
+        },
+        uiOptions: {
+          toolbar: [
+            ['back', 'forward', 'up', 'home', 'reload'],
+            ['getfile', 'info'],
+            ['sort'],
+          ],
+        },
+        contextmenu: {
+          navbar: ['open', 'getfile', 'info'],
+          cwd: ['reload', 'info'],
+          files: ['getfile', 'open', 'info'],
+        },
+      });
+      this.browser.instance = $('#annotation-file-browser').elfinder('instance');
+      this.browser.initialized = true;
+    },
+
+    useSelectedAnnotation() {
+      const fm = this.browser.instance;
+      const selected = fm ? fm.selected() : [];
+      if (!selected.length) {
+        alert('Select an annotation json file first.');
+        return;
+      }
+      const file = fm.file(selected[0]);
+      if (!file || !file.path || !file.path.endsWith('.json')) {
+        alert('Please select a .json file.');
+        return;
+      }
+      this.annotationPath = file.path;
+      this.browser.open = false;
+    },
+
+    detectionSummary() {
+      if (!this.annotation) return '';
+      const total = this.detections.length;
+      const visible = this.detections.filter((det) => this.isDetectionVisible(det)).length;
+      const visibleClasses = this.classGroups.filter((group) => group.visible).length;
+      return `${visible}/${total} detections visible across ${visibleClasses}/${this.classGroups.length} categories`;
+    },
+
+    buildClassGroups() {
+      const groups = new Map();
+      for (const det of this.detections) {
+        const name = det.class_name || 'unknown';
+        const group = groups.get(name) || {
+          name,
+          visible: true,
+          count: 0,
+          maskCount: 0,
+          maxScore: 0,
+        };
+        group.count += 1;
+        if (det.has_mask) group.maskCount += 1;
+        group.maxScore = Math.max(group.maxScore, Number(det.score || 0));
+        groups.set(name, group);
+      }
+      this.classGroups = Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
+      this.selectedClass = this.classGroups.length ? this.classGroups[0].name : null;
+    },
+
+    setClassVisible(className, visible) {
+      const group = this.classGroups.find((item) => item.name === className);
+      if (group) group.visible = visible;
+      this.draw();
+    },
+
+    isDetectionVisible(det) {
+      const className = det.class_name || 'unknown';
+      const group = this.classGroups.find((item) => item.name === className);
+      return group ? group.visible : true;
+    },
+
+    clearMaskCache() {
+      Object.values(this.maskAbortControllers).forEach((controller) => {
+        try { controller.abort(); } catch (_) {}
+      });
+      this.maskAbortControllers = {};
+      Object.values(this.maskCache).forEach((entry) => {
+        if (entry.url) URL.revokeObjectURL(entry.url);
+      });
+      this.maskCache = {};
+    },
+
+    async loadAnnotation() {
+      const path = this.annotationPath.trim();
+      if (!path) {
+        this.error = 'Annotation path is required.';
+        return;
+      }
+      const token = ++this.activeToken;
+      this.loading = true;
+      this.error = '';
+      try {
+        const response = await fetch('/sam3/annotation-preview?path=' + encodeURIComponent(path));
+        if (!response.ok) {
+          this.error = await response.text();
+          return;
+        }
+        const annotation = await response.json();
+        if (token !== this.activeToken) return;
+
+        this.annotation = annotation;
+        this.detections = (this.annotation.annotations || []).map((det, index) => ({
+          ...det,
+          index,
+        }));
+        this.buildClassGroups();
+        this.clearMaskCache();
+        this.imageUrl = '/sam3/image?path=' + encodeURIComponent(this.annotation.image);
+        await this.loadBaseImage(this.imageUrl);
+        if (token !== this.activeToken) return;
+        this.syncCanvasSize();
+        this.draw();
+      } catch (error) {
+        if (token !== this.activeToken) return;
+        this.error = error.message;
+      } finally {
+        if (token === this.activeToken) this.loading = false;
+      }
+    },
+
+    async loadBaseImage(url) {
+      await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+          this.baseImage = image;
+          resolve();
+        };
+        image.onerror = () => reject(new Error('Failed to load source image'));
+        image.src = url;
+      });
+    },
+
+    syncCanvasSize() {
+      const canvas = this.$refs.overlayCanvas;
+      if (!canvas || !this.baseImage) return;
+      const parent = canvas.parentElement;
+      if (!parent || !parent.clientWidth) return;
+      const scale = parent.clientWidth / this.baseImage.width;
+      const width = Math.max(1, Math.round(this.baseImage.width * scale));
+      const height = Math.max(1, Math.round(this.baseImage.height * scale));
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    },
+
+    async ensureMaskLoaded(index) {
+      const token = this.activeToken;
+      const cached = this.maskCache[index];
+      if (cached || !this.annotationPath) return;
+      const controller = new AbortController();
+      this.maskAbortControllers[index] = controller;
+      this.maskCache[index] = { loading: true };
+      let response = null;
+      try {
+        response = await fetch(
+          '/sam3/mask-overlay?annotation_path=' +
+          encodeURIComponent(this.annotationPath) +
+          '&annotation_index=' +
+          encodeURIComponent(index),
+          { signal: controller.signal }
+        );
+      } catch (error) {
+        if (controller.signal.aborted || token !== this.activeToken) return;
+        this.maskCache[index] = { loading: false, missing: true };
+        return;
+      } finally {
+        delete this.maskAbortControllers[index];
+      }
+      if (token !== this.activeToken) return;
+      if (!response.ok) {
+        this.maskCache[index] = { loading: false, missing: true };
+        return;
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+      image.onload = () => {
+        if (token !== this.activeToken) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        this.maskCache[index] = { loading: false, loaded: true, url, image };
+        this.draw();
+      };
+      image.src = url;
+    },
+
+    draw() {
+      if (this.drawScheduled) return;
+      this.drawScheduled = true;
+      requestAnimationFrame(() => {
+        this.drawScheduled = false;
+        this.drawImmediate();
+      });
+    },
+
+    async drawImmediate() {
+      const canvas = this.$refs.overlayCanvas;
+      if (!canvas || !this.annotation || !this.baseImage) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(this.baseImage, 0, 0, canvas.width, canvas.height);
+
+      const width = Number(this.annotation.width || this.baseImage.width || 1);
+      const height = Number(this.annotation.height || this.baseImage.height || 1);
+      const scaleX = canvas.width / width;
+      const scaleY = canvas.height / height;
+
+      if (this.showMasks) {
+        for (const det of this.detections) {
+          if (!this.isDetectionVisible(det) || !det.has_mask) continue;
+          const entry = this.maskCache[det.index];
+          if (!entry) {
+            this.ensureMaskLoaded(det.index);
+            continue;
+          }
+          if (entry.loaded && entry.image) {
+            ctx.drawImage(entry.image, 0, 0, canvas.width, canvas.height);
+          }
+        }
+      }
+
+      if (!this.showBoxes) return;
+      for (const det of this.detections) {
+        if (!this.isDetectionVisible(det) || !Array.isArray(det.bbox_xyxy) || det.bbox_xyxy.length < 4) continue;
+        const [x1, y1, x2, y2] = det.bbox_xyxy.map(Number);
+        const selected = (det.class_name || 'unknown') === this.selectedClass;
+        ctx.lineWidth = selected ? 3 : 2;
+        ctx.strokeStyle = selected ? '#00f2ff' : '#4d94ff';
+        ctx.strokeRect(x1 * scaleX, y1 * scaleY, Math.max(1, (x2 - x1) * scaleX), Math.max(1, (y2 - y1) * scaleY));
+
+        const label = `${det.class_name || 'unknown'} ${(Number(det.score || 0)).toFixed(3)}`;
+        ctx.font = '12px monospace';
+        const textWidth = ctx.measureText(label).width + 8;
+        const labelX = x1 * scaleX;
+        const labelY = Math.max(14, y1 * scaleY - 4);
+        ctx.fillStyle = selected ? 'rgba(0, 242, 255, 0.95)' : 'rgba(77, 148, 255, 0.92)';
+        ctx.fillRect(labelX, labelY - 14, textWidth, 14);
+        ctx.fillStyle = '#05101a';
+        ctx.fillText(label, labelX + 4, labelY - 3);
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

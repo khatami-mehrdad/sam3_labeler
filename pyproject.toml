@@ -1,20 +1,39 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "sam3-labeler"
+name = "dg-labeller"
 version = "0.1.0"
-description = "SAM 3 based auto-labeling utilities for restaurant images and videos"
-requires-python = ">=3.12"
+description = "Internal labeling tool for DeGirum — prepares frames and orchestrates SAM3 worker processes that write raw annotation artifacts"
+requires-python = ">=3.11"
 dependencies = [
-  "numpy",
-  "opencv-python",
-  "pillow",
-  "pyyaml",
-  "tqdm",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.20",
+    "aiosqlite>=0.20",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+    "pillow>=10",
+    "imagehash>=4.3",
+    "scenedetect[opencv]>=0.6",
+    "tqdm",
+    "python-dotenv>=1.0",
+    "numpy",
+    "pandas>=2.0",
+    "pyarrow",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx",
+    "pytest",
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["sam3_labeler*"]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+    "slow: tests that intentionally use larger fixture subsets",
+    "sam3: tests that require a configured SAM3 model environment",
+]

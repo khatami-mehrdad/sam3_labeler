@@ -1,0 +1,29 @@
+# Weapons SAM3.1 labeling recipe.
+
+video_fps: 2.0
+scene_detect: true
+scene_threshold: 27.0
+phash_dedup: true
+
+ontology:
+  - class_id: 0
+    class_name: weapon
+    prompt: handgun
+  - class_id: 0
+    class_name: weapon
+    prompt: rifle
+  - class_id: 0
+    class_name: weapon
+    prompt: shotgun
+  - class_id: 0
+    class_name: weapon
+    prompt: pistol
+  - class_id: 0
+    class_name: weapon
+    prompt: gun
+  - class_id: 0
+    class_name: weapon
+    prompt: firearm
+
+score_threshold: 0.35
+save_masks: true

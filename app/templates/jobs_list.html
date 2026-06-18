@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Jobs · dg-labeller{% endblock %}
+{% set active = 'labeling' %}
+{% block headerstatus %}<span>{{ jobs|length }} jobs</span>{% endblock %}
+
+{% block content %}
+<div class="section-header">
+  <span>Recent jobs</span>
+  <div style="margin-left:auto"><a class="btn btn-primary" href="/new">+ New run</a></div>
+</div>
+
+<div class="panel" style="padding:0">
+  {% if jobs %}
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Progress</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr>
+        <td>
+          {% if j.type == 'labeling' %}
+            <a class="job-name" href="/jobs/{{ j.id }}/view">{{ j.name }}</a>
+            {% if j.description %}<div class="mono" style="margin-top:2px">{{ j.description[:80] }}</div>{% endif %}
+          {% elif j.type == 'export' %}
+            <span class="job-name">{{ j.name }}</span>
+          {% else %}
+            <span class="job-name">{{ j.name }}</span>
+          {% endif %}
+        </td>
+        <td><span class="tag">{{ j.type }}</span></td>
+        <td><span class="pill {{ j.status }}"><span class="dot"></span>{{ j.status }}</span></td>
+        <td>
+          {% if j.progress_pct is not none %}
+          <div class="progress"><div class="bar" style="width: {{ (j.progress_pct or 0)*100 }}%"></div></div>
+          {% else %}
+          <span class="mono">—</span>
+          {% endif %}
+        </td>
+        <td class="mono">{{ j.created_at }}</td>
+        <td>
+          {% if j.type == 'labeling' %}
+            <a class="btn btn-ghost" href="/jobs/{{ j.id }}/view">Open</a>
+          {% elif j.type == 'export' %}
+            <a class="btn btn-ghost" href="/exports">Open</a>
+          {% elif j.type == 'ontology' %}
+            <a class="btn btn-ghost" href="/ontology">Open</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No jobs yet — <a href="/new" style="color:var(--brand)">create one</a></div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ job.name }} · dg-labeller{% endblock %}
+{% set active = 'labeling' %}
+
+{% block content %}
+<div x-data="jobDetail('{{ job.id }}')" x-init="poll()">
+  <div class="section-header">
+    <a href="/" style="color:var(--text-3);text-decoration:none">← labeling runs</a>
+    <span style="color:var(--text-1);font-weight:500">{{ job.name }}</span>
+    <span class="pill" :class="job.status" style="margin-left:8px">
+      <span class="dot"></span><span x-text="job.status"></span>
+    </span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">Status</div>
+    <div class="row">
+      <div>
+        <div class="hint" style="font-size:9px;letter-spacing:0.10em;text-transform:uppercase">Stage</div>
+        <div class="mono" style="font-size:14px;color:var(--text-0)" x-text="job.current_stage || '—'"></div>
+      </div>
+      <div>
+        <div class="hint" style="font-size:9px;letter-spacing:0.10em;text-transform:uppercase">Progress</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="progress" style="width:200px">
+            <div class="bar" :style="`width: ${(job.progress_pct||0)*100}%`"></div>
+          </div>
+          <span class="mono" x-text="`${Math.round((job.progress_pct||0)*100)}%`"></span>
+        </div>
+      </div>
+      <div>
+        <div class="hint" style="font-size:9px;letter-spacing:0.10em;text-transform:uppercase">Created</div>
+        <div class="mono" x-text="job.created_at"></div>
+      </div>
+      <div>
+        <div class="hint" style="font-size:9px;letter-spacing:0.10em;text-transform:uppercase">Finished</div>
+        <div class="mono" x-text="job.finished_at || '—'"></div>
+      </div>
+    </div>
+    <div x-show="job.error" class="error-text" style="margin-top:12px" x-text="job.error"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">Raw SAM3 artifacts</div>
+    <div class="mono" style="font-size:11px;color:var(--text-1)">{{ job.output_path }}</div>
+    <div class="mono" style="font-size:10px;color:var(--text-3);margin-top:6px">
+      {{ job.output_path }}/sam3/run.json
+    </div>
+    <div class="mono" style="font-size:10px;color:var(--text-3)">
+      {{ job.output_path }}/sam3/annotations/
+    </div>
+    <div class="mono" style="font-size:10px;color:var(--text-3)">
+      {{ job.output_path }}/sam3/masks/
+    </div>
+    <div class="hint" style="margin-top:8px">Curation and export are separate tasks and are not run as part of labeling.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">Configuration</div>
+    <pre class="log" style="max-height:240px">{{ job.config_yaml }}</pre>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">Logs (current stage)</div>
+    <pre class="log" x-text="logText || '(no logs yet)'"></pre>
+  </div>
+</div>
+
+<script>
+function jobDetail(jobId) {
+  return {
+    jobId,
+    job: {{ job|tojson }},
+    logText: '',
+    timer: null,
+
+    async poll() {
+      await this.refresh();
+      if (!['done', 'failed', 'cancelled'].includes(this.job.status)) {
+        this.timer = setTimeout(() => this.poll(), 5000);
+      }
+    },
+
+    async refresh() {
+      try {
+        const r = await fetch('/jobs/' + this.jobId);
+        if (r.ok) this.job = await r.json();
+        const stage = this.job.current_stage || (this.job.status === 'failed' ? 'ERROR' : 'sam3_labeling');
+        const lr = await fetch('/jobs/' + this.jobId + '/logs/' + stage);
+        if (lr.ok) this.logText = (await lr.json()).text || '';
+      } catch (e) {
+        this.logText = 'poll error: ' + e.message;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

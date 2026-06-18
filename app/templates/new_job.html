@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}New labeling run · dg-labeller{% endblock %}
+{% set active = 'labeling' %}
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/css/elfinder.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/css/theme.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/js/elfinder.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="newLabelingRun()">
+  <div class="section-header"><span>Create SAM3.1 labeling run</span></div>
+
+  <div class="row" style="gap:24px;align-items:flex-start">
+    <div style="flex:2">
+      <div class="panel">
+        <div class="panel-header">Run</div>
+        <div class="field">
+          <label>Run name</label>
+          <input class="input" x-model="form.name" placeholder="e.g., cafe_common_objects_v1">
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea class="textarea" x-model="form.description"
+                    placeholder="What are these labels for?"></textarea>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Sources and frame prep</div>
+        <div class="field">
+          <div class="label-row">
+            <label>Image folders / video files (one per line)</label>
+            <button type="button" class="btn btn-ghost" @click="openBrowser()">Browse server folders</button>
+          </div>
+          <textarea class="textarea" x-model="form.sources_text" rows="6" placeholder="/path/to/images
+/path/to/video.mp4"></textarea>
+          <div class="hint">Folders are scanned recursively for images. Video sources can be .avi, .m4v, .mkv, .mov, .mp4, or .webm files.</div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Video FPS</label>
+            <input class="input" type="number" step="0.5" min="0.1" max="30"
+                   x-model.number="form.video_fps">
+          </div>
+          <div class="field">
+            <label>Scene threshold</label>
+            <input class="input" type="number" step="0.5" min="5" max="60"
+                   x-model.number="form.scene_threshold">
+          </div>
+        </div>
+        <label class="checkbox"><input type="checkbox" x-model="form.scene_detect"> Use scene-change detection for videos</label><br>
+        <label class="checkbox"><input type="checkbox" x-model="form.phash_dedup"> Run pHash dedup before SAM3 labeling</label>
+      </div>
+
+      <div class="modal-backdrop" x-show="browser.open" x-cloak>
+        <div class="modal">
+          <div class="modal-header">
+            <div>
+              <div class="panel-header" style="margin-bottom:4px">Browse server files</div>
+              <div class="hint">Select an image folder or local video file under <span class="mono">DGL_BROWSE_ROOT</span>.</div>
+            </div>
+            <button type="button" class="btn btn-ghost" @click="browser.open = false">Close</button>
+          </div>
+          <div class="browser-actions">
+            <button type="button" class="btn btn-primary" @click="appendCurrentFolder()">Use current folder</button>
+            <button type="button" class="btn" @click="appendSelectedSource()">Add selected</button>
+          </div>
+          <div id="source-file-browser"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">SAM3 ontology</div>
+        <div class="field">
+          <label>Prompts and classes
+            <span class="info" data-tip="Paste either YAML-style `prompt: class_name` rows or `prompt | class_name` rows. Blank lines and lines starting with # are ignored.">i</span>
+          </label>
+          <textarea class="textarea" x-model="form.ontology_text" rows="7" placeholder="# prompt: class_name
+person: person
+table: table
+chair: chair"></textarea>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Score threshold</label>
+            <input class="input" type="number" step="0.05" min="0" max="1"
+                   x-model.number="form.score_threshold">
+          </div>
+        </div>
+        <label class="checkbox"><input type="checkbox" x-model="form.save_masks"> Save SAM3 masks as compressed .npz sidecars</label>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Worker runtime</div>
+        <div class="field">
+          <label>GPU IDs (optional, comma separated)</label>
+          <input class="input" x-model="form.allowed_gpus_text" placeholder="Leave blank to auto-select least occupied GPUs">
+          <div class="hint">Explicit IDs take priority. Leave blank to use the least occupied available GPUs.</div>
+        </div>
+        <div class="field">
+          <label>Number of GPUs</label>
+          <input class="input" type="number" min="1" step="1"
+                 x-model.number="form.gpu_count">
+          <div class="hint">Used only when GPU IDs is blank.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Output</div>
+        <div class="field">
+          <label>Output directory (leave blank for default)</label>
+          <input class="input" x-model="form.output_dir" placeholder="(default: jobs/<run_id>/)">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin:16px 0">
+        <button type="button" class="btn btn-primary" :disabled="submitting" @click="submit()">
+          <span x-show="!submitting">Submit labeling run</span>
+          <span x-show="submitting">Submitting...</span>
+        </button>
+        <a class="btn btn-ghost" href="/">Cancel</a>
+      </div>
+    </div>
+
+    <div style="flex:1;position:sticky;top:80px">
+      <div class="panel elevated">
+        <div class="panel-header">Output contract</div>
+        <div class="hint">The labeling run stops at raw SAM3 artifacts:</div>
+        <ul style="font-size:11px;color:var(--text-2);padding-left:18px">
+          <li><span class="mono">frames.db</span> with frame status</li>
+          <li><span class="mono">sam3/annotations/**/*.json</span></li>
+          <li><span class="mono">sam3/masks/**/*.npz</span> when enabled</li>
+          <li><span class="mono">sam3/run.json</span> metadata</li>
+        </ul>
+        <div class="hint">Curation and dataset export are separate tasks after labeling finishes.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function newLabelingRun() {
+  return {
+    submitting: false,
+    form: {
+      name: '',
+      description: '',
+      sources_text: '',
+      video_fps: 2.0,
+      scene_threshold: 27.0,
+      scene_detect: true,
+      phash_dedup: true,
+      ontology_text: '',
+      score_threshold: 0.35,
+      save_masks: true,
+      allowed_gpus_text: '',
+      gpu_count: 1,
+      output_dir: '',
+    },
+    browser: {
+      open: false,
+      initialized: false,
+      instance: null,
+    },
+
+    splitLines(s) {
+      return s.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    },
+
+    appendSource(path) {
+      const current = this.form.sources_text.trim();
+      this.form.sources_text = current ? current + '\n' + path : path;
+      this.browser.open = false;
+    },
+
+    async openBrowser() {
+      this.browser.open = true;
+      this.$nextTick(() => this.initFileBrowser());
+    },
+
+    initFileBrowser() {
+      if (this.browser.initialized) return;
+      const component = this;
+      $('#source-file-browser').elfinder({
+        url: '/elfinder',
+        lang: 'en',
+        height: 520,
+        resizable: false,
+        rememberLastDir: false,
+        commandsOptions: {
+          getfile: {
+            onlyURL: false,
+            folders: false,
+            multiple: false,
+          },
+        },
+        getFileCallback(file, fm) {
+          if (!file) return;
+          if (file.mime === 'directory') {
+            fm.exec('open', file.hash);
+            return false;
+          }
+          if (file.path) component.appendSource(file.path);
+          return false;
+        },
+        handlers: {
+          dblclick(event, fm) {
+            const selected = fm.selected();
+            if (!selected.length) return false;
+            const file = fm.file(selected[0]);
+            if (!file) return false;
+            event.preventDefault();
+            if (file.mime === 'directory') {
+              fm.request({
+                data: {cmd: 'open', target: selected[0]},
+                notify: {type: 'open', target: selected[0]},
+                syncOnFail: true,
+              });
+            } else if (file.path) {
+              component.appendSource(file.path);
+            }
+            return false;
+          },
+        },
+        uiOptions: {
+          toolbar: [
+            ['back', 'forward', 'up', 'home', 'reload'],
+            ['getfile', 'info'],
+            ['sort'],
+          ],
+        },
+        contextmenu: {
+          navbar: ['open', 'getfile', 'info'],
+          cwd: ['reload', 'info'],
+          files: ['getfile', 'open', 'info'],
+        },
+      });
+      this.browser.instance = $('#source-file-browser').elfinder('instance');
+      this.browser.initialized = true;
+    },
+
+    appendCurrentFolder() {
+      const fm = this.browser.instance;
+      const cwd = fm && fm.cwd();
+      if (cwd && cwd.path) this.appendSource(cwd.path);
+    },
+
+    appendSelectedSource() {
+      const fm = this.browser.instance;
+      const selected = fm ? fm.selected() : [];
+      if (!selected.length) {
+        alert('Select a folder or video file first.');
+        return;
+      }
+      const file = fm.file(selected[0]);
+      if (file && file.path) this.appendSource(file.path);
+    },
+
+    buildOntology() {
+      return this.form.ontology_text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map((line, i) => {
+        const separator = line.includes('|') ? '|' : ':';
+        const parts = line.split(separator).map(x => x.trim()).filter(Boolean);
+        const prompt = parts[0];
+        const className = parts[1] || prompt;
+        return { class_id: i, prompt, class_name: className };
+      });
+    },
+
+    buildOverrides() {
+      const cfg = {
+        sources: this.splitLines(this.form.sources_text),
+        video_fps: this.form.video_fps,
+        scene_threshold: this.form.scene_threshold,
+        scene_detect: this.form.scene_detect,
+        phash_dedup: this.form.phash_dedup,
+        ontology: this.buildOntology(),
+        score_threshold: this.form.score_threshold,
+        save_masks: this.form.save_masks,
+      };
+      const gpus = this.form.allowed_gpus_text.split(',').map(x => x.trim()).filter(Boolean).map(Number);
+      if (gpus.length) cfg.allowed_gpus = gpus;
+      else if (this.form.gpu_count) cfg.gpu_count = this.form.gpu_count;
+      return cfg;
+    },
+
+    async submit() {
+      this.submitting = true;
+      try {
+        const r = await fetch('/jobs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            name: this.form.name || 'untitled',
+            description: this.form.description,
+            output_dir: this.form.output_dir || null,
+            recipe_overrides: this.buildOverrides(),
+          }),
+        });
+        if (!r.ok) { alert('Submit failed: ' + await r.text()); return; }
+        const out = await r.json();
+        window.location.href = '/jobs/' + out.job_id + '/view';
+      } catch (e) {
+        alert('Submit error: ' + e.message);
+      } finally {
+        this.submitting = false;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

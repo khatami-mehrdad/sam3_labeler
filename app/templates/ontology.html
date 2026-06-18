@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block title %}Ontology generator · dg-labeller{% endblock %}
+{% set active = 'ontology' %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/css/elfinder.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/css/theme.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/elfinder/2.1.65/js/elfinder.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="ontologyGen()">
+  <div class="section-header"><span>VLM-assisted ontology generator</span></div>
+
+  <div class="row" style="gap:24px;align-items:flex-start">
+    <!-- Left: Config -->
+    <div style="flex:2">
+
+      <div class="panel">
+        <div class="panel-header">Reference images</div>
+        <div class="field">
+          <div class="label-row">
+            <label>Image folder
+              <span class="info" data-tip="Folder containing reference images showing the objects you want to detect. Sub-folders are searched recursively.">i</span>
+            </label>
+            <button type="button" class="btn btn-ghost" @click="openBrowser()">Browse server folders</button>
+          </div>
+          <input class="input" x-model="form.image_dir"
+                 placeholder="/path/to/images">
+        </div>
+        <div class="field">
+          <label>Objects to detect
+            <span class="info" data-tip="List the objects you want SAM3 to find. One per line. The VLM will see your reference images and generate the best SAM3 text prompts for each.">i</span>
+          </label>
+          <textarea class="textarea" x-model="form.classes_text" rows="4"
+                    placeholder="shipping label
+barcode
+yellow sticker"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-backdrop" x-show="browser.open" x-cloak>
+        <div class="modal">
+          <div class="modal-header">
+            <div>
+              <div class="panel-header" style="margin-bottom:4px">Browse server files</div>
+              <div class="hint">Select the exemplar folder containing one sub-directory per class.</div>
+            </div>
+            <button type="button" class="btn btn-ghost" @click="browser.open = false">Close</button>
+          </div>
+          <div class="browser-actions">
+            <button type="button" class="btn btn-primary" @click="useCurrentFolder()">Use current folder</button>
+          </div>
+          <div id="exemplar-file-browser"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">VLM provider</div>
+        <div class="row">
+          <div class="field">
+            <label>Provider</label>
+            <select class="select" x-model="form.provider"
+                    @change="form.api_key = _keys[form.provider] || '';
+                             form.model = form.provider === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-5.4'"
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Model</label>
+            <input class="input" x-model="form.model"
+                   placeholder="gpt-5.4 / claude-sonnet-4-6">
+          </div>
+        </div>
+        <div class="field">
+          <label>API key</label>
+          <input class="input" type="password" x-model="form.api_key"
+                 placeholder="sk-...">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Optimization settings</div>
+        <div class="row">
+          <div class="field">
+            <label>Score threshold</label>
+            <input class="input" type="number" step="0.05" min="0.1" max="1"
+                   x-model.number="form.score_threshold">
+            <div class="hint">Prompt must reach this avg SAM3 score to be accepted.</div>
+          </div>
+          <div class="field">
+            <label>Max iterations</label>
+            <input class="input" type="number" step="1" min="1" max="10"
+                   x-model.number="form.max_iterations">
+            <div class="hint">VLM→SAM3 refinement rounds per class.</div>
+          </div>
+          <div class="field">
+            <label>Max images</label>
+            <input class="input" type="number" step="1" min="1" max="100"
+                   x-model.number="form.max_images">
+            <div class="hint">Cap on reference images used. More = better but slower.</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin:16px 0">
+        <button type="button" class="btn btn-primary"
+                :disabled="running"
+                @click="startGeneration()">
+          <span x-show="!running">Generate ontology</span>
+          <span x-show="running"><span class="spinner" style="display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:6px"></span> Running...</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: Progress + Results -->
+    <div style="flex:3;position:sticky;top:80px">
+
+      <!-- Job history -->
+      <div class="panel" x-show="_recentJobs && _recentJobs.length > 0" style="padding:10px 16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-size:9px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:var(--text-3);white-space:nowrap">Recent jobs</label>
+          <select class="select" style="flex:1;font-size:11px"
+                  :value="jobId"
+                  @change="jobId = $event.target.value; restoreJob(jobId)">
+            <template x-for="j in _recentJobs" :key="j.id">
+              <option :value="j.id"
+                      x-text="j.id + ' — ' + j.classes.join(', ') + ' [' + j.status + ']'"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+
+      <!-- Progress panel -->
+      <div class="panel" x-show="running || progressLog.length > 0">
+        <div class="panel-header">Progress</div>
+        <div class="log" style="max-height:220px;overflow:auto;font-size:10px"
+             x-ref="progressBox">
+          <template x-for="msg in progressLog" :key="msg">
+            <div x-text="msg"></div>
+          </template>
+          <div x-show="progressLog.length === 0 && running" style="color:var(--text-3)">Starting...</div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-text" x-show="error" x-text="error" style="margin-bottom:16px"></div>
+
+      <!-- Results -->
+      <template x-if="results && results.length > 0">
+        <div>
+          <div class="panel">
+            <div class="panel-header">Generated ontology</div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Prompt</th>
+                  <th>Score</th>
+                  <th>Hit rate</th>
+                  <th></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="r in results" :key="r.class_name">
+                  <template x-for="(kp, ki) in r.kept_prompts" :key="r.class_name + '-' + ki">
+                    <tr>
+                      <td>
+                        <span x-show="ki === 0" x-text="r.class_name"></span>
+                        <span x-show="ki > 0" style="color:var(--text-3);font-size:10px">↳ alias</span>
+                      </td>
+                      <td>
+                        <input class="input" style="width:100%;font-size:11px"
+                               :value="kp.prompt"
+                               @input="kp.prompt = $event.target.value">
+                      </td>
+                      <td class="mono" x-text="kp.avg_score.toFixed(2)"></td>
+                      <td class="mono" x-text="(kp.hit_rate * 100).toFixed(0) + '%'"></td>
+                      <td>
+                        <span x-show="ki === 0" class="pill" :class="r.converged ? 'done' : 'failed'">
+                          <span class="dot"></span>
+                          <span x-text="r.converged ? 'converged' : 'best effort'"></span>
+                        </span>
+                      </td>
+                      <td>
+                        <button x-show="ki > 0" class="btn btn-ghost" style="padding:2px 6px;font-size:9px"
+                                @click="r.kept_prompts.splice(ki, 1)">✕</button>
+                      </td>
+                    </tr>
+                  </template>
+                </template>
+              </tbody>
+            </table>
+            <div class="hint" style="margin-top:8px">Multiple prompts per class improve coverage. Remove aliases with ✕ if not needed.</div>
+          </div>
+
+          <!-- All scores expand -->
+          <div class="panel" x-show="showAllScores">
+            <div class="panel-header">All tested prompts</div>
+            <template x-for="r in results" :key="'all-' + r.class_name">
+              <div style="margin-bottom:16px">
+                <div style="font-weight:600;font-size:11px;color:var(--text-1);margin-bottom:4px"
+                     x-text="r.class_name"></div>
+                <template x-for="s in r.all_scores" :key="s.prompt + s.iteration">
+                  <div style="display:flex;gap:8px;align-items:center;padding:3px 0;font-size:11px">
+                    <span class="mono" style="width:30px;color:var(--text-3)"
+                          x-text="'#' + s.iteration"></span>
+                    <span style="flex:1" x-text="s.prompt"></span>
+                    <span class="mono" x-text="s.avg_score.toFixed(2)"></span>
+                    <span class="mono" style="color:var(--text-3)" x-text="(s.hit_rate * 100).toFixed(0) + '%'"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap">
+            <button class="btn btn-ghost" @click="showAllScores = !showAllScores"
+                    x-text="showAllScores ? 'Hide all scores' : 'Show all scores'"></button>
+            <div style="flex:1"></div>
+            <div class="field" style="margin:0;flex:0 0 auto">
+              <input class="input" x-model="savePath" style="width:280px;font-size:11px"
+                     placeholder="configs/generated_ontology.yaml">
+            </div>
+            <button class="btn btn-primary" @click="saveOntology()">Save ontology YAML</button>
+          </div>
+
+          <div class="error-text" x-show="saveError" x-text="saveError" style="margin-top:8px"></div>
+          <div x-show="saveSuccess" style="color:var(--brand);font-size:11px;margin-top:8px"
+               x-text="saveSuccess"></div>
+        </div>
+      </template>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function ontologyGen() {
+  return {
+    _keys: {openai: '{{ openai_key }}', anthropic: '{{ anthropic_key }}'},
+    _recentJobs: {{ recent_jobs_json | safe }},
+    form: {
+      image_dir: '',
+      classes_text: '',
+      provider: 'openai',
+      model: 'gpt-5.4',
+      api_key: '{{ openai_key }}',
+      score_threshold: 0.5,
+      max_iterations: 3,
+      max_images: 15,
+    },
+    browser: { open: false, initialized: false, instance: null },
+    running: false,
+    jobId: null,
+    progressLog: [],
+    results: null,
+    error: null,
+    showAllScores: false,
+    savePath: 'configs/generated_ontology.yaml',
+    saveError: null,
+    saveSuccess: null,
+
+    init() {
+      if (!this._recentJobs || !this._recentJobs.length) return;
+      const latest = this._recentJobs[0];
+      this.jobId = latest.id;
+      if (latest.image_dir) this.form.image_dir = latest.image_dir;
+      if (latest.classes && latest.classes.length) this.form.classes_text = latest.classes.join('\n');
+      if (latest.status === 'running') {
+        this.running = true;
+        this.pollStatus();
+      } else {
+        this.restoreJob(latest.id);
+      }
+    },
+
+    async restoreJob(jobId) {
+      try {
+        const resp = await fetch('/ontology/status/' + jobId);
+        const data = await resp.json();
+        this.progressLog = data.progress || [];
+        if (data.status === 'done') this.results = data.results;
+        if (data.status === 'failed') this.error = data.error || 'Generation failed.';
+      } catch (e) {}
+    },
+
+    async openBrowser() {
+      this.browser.open = true;
+      this.$nextTick(() => this.initFileBrowser());
+    },
+
+    initFileBrowser() {
+      if (this.browser.initialized) return;
+      const component = this;
+      $('#exemplar-file-browser').elfinder({
+        url: '/elfinder',
+        lang: 'en',
+        height: 520,
+        resizable: false,
+        rememberLastDir: false,
+        commandsOptions: { getfile: { onlyURL: false, folders: true, multiple: false } },
+        getFileCallback(file) {
+          if (file && file.path) {
+            component.form.image_dir = file.path;
+            component.browser.open = false;
+          }
+          return false;
+        },
+        handlers: {
+          dblclick(event, fm) {
+            const selected = fm.selected();
+            if (!selected.length) return false;
+            const file = fm.file(selected[0]);
+            if (!file) return false;
+            if (file.mime === 'directory') {
+              event.preventDefault();
+              fm.request({ data: {cmd: 'open', target: selected[0]}, notify: {type: 'open', target: selected[0]}, syncOnFail: true });
+            }
+            return false;
+          },
+        },
+        uiOptions: { toolbar: [['back', 'forward', 'up', 'home', 'reload'], ['getfile', 'info'], ['sort']] },
+        contextmenu: { navbar: ['open', 'getfile', 'info'], cwd: ['reload', 'info'], files: ['getfile', 'open', 'info'] },
+      });
+      this.browser.instance = $('#exemplar-file-browser').elfinder('instance');
+      this.browser.initialized = true;
+    },
+
+    useCurrentFolder() {
+      const fm = this.browser.instance;
+      const cwd = fm && fm.cwd();
+      if (cwd && cwd.path) {
+        this.form.image_dir = cwd.path;
+        this.browser.open = false;
+      }
+    },
+
+    parseClasses() {
+      return this.form.classes_text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    },
+
+    async startGeneration() {
+      this.error = null;
+      this.results = null;
+      this.progressLog = [];
+      this.saveError = null;
+      this.saveSuccess = null;
+
+      if (!this.form.image_dir.trim()) {
+        this.error = 'Image folder is required.';
+        return;
+      }
+      const classes = this.parseClasses();
+      if (!classes.length) {
+        this.error = 'Specify at least one object to detect.';
+        return;
+      }
+      if (!this.form.api_key.trim()) {
+        this.error = 'API key is required.';
+        return;
+      }
+
+      this.running = true;
+      try {
+        const resp = await fetch('/ontology/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            image_dir: this.form.image_dir.trim(),
+            classes,
+            provider: this.form.provider,
+            model: this.form.model,
+            api_key: this.form.api_key,
+            score_threshold: this.form.score_threshold,
+            max_iterations: this.form.max_iterations,
+            max_images: this.form.max_images,
+          }),
+        });
+        if (!resp.ok) {
+          this.error = 'Failed to start: ' + await resp.text();
+          this.running = false;
+          return;
+        }
+        const data = await resp.json();
+        this.jobId = data.job_id;
+        this.pollStatus();
+      } catch (e) {
+        this.error = 'Request failed: ' + e.message;
+        this.running = false;
+      }
+    },
+
+    async pollStatus() {
+      while (this.running) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const resp = await fetch('/ontology/status/' + this.jobId);
+          const data = await resp.json();
+          this.progressLog = data.progress || [];
+
+          // Auto-scroll progress
+          this.$nextTick(() => {
+            const box = this.$refs.progressBox;
+            if (box) box.scrollTop = box.scrollHeight;
+          });
+
+          if (data.status === 'done') {
+            this.results = data.results;
+            this.running = false;
+          } else if (data.status === 'failed') {
+            this.error = data.error || 'Generation failed.';
+            this.running = false;
+          }
+        } catch (e) {
+          // Retry on transient network errors
+        }
+      }
+    },
+
+    async saveOntology() {
+      this.saveError = null;
+      this.saveSuccess = null;
+      if (!this.results) return;
+
+      const entries = [];
+      for (const r of this.results) {
+        for (const kp of r.kept_prompts) {
+          entries.push({ prompt: kp.prompt, class_name: r.class_name });
+        }
+      }
+
+      try {
+        const resp = await fetch('/ontology/save', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            path: this.savePath,
+            entries,
+          }),
+        });
+        if (!resp.ok) {
+          this.saveError = 'Save failed: ' + await resp.text();
+          return;
+        }
+        const data = await resp.json();
+        this.saveSuccess = `Saved ${data.n_entries} entries to ${data.path}`;
+      } catch (e) {
+        this.saveError = 'Save error: ' + e.message;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}
